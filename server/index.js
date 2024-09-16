@@ -1,75 +1,51 @@
-const express = require('express');
+
+import '@babel/polyfill';
+//const newrelic = require('newrelic');
+// const expressStaticGzip = require('express-static-gzip');
+
+import express from 'express';
+import renderReact from './templates/renderReact.js';
+import App from '../client/src/App.jsx';
+import router from './routes/routes.js';
+
 const path = require('path');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-const db = require('../db/index.js');
+const compression = require('compression');
+const bodyParser = require('body-parser');
 
+const api = 'http://sdcloadbalancer-1748024864.us-west-1.elb.amazonaws.com/bundle.js'
 
+const database = require('../database');
+const morgan = require('morgan');
 const app = express();
-const port = 3333;
-app.use(express.static(path.join(__dirname, '../public/dist')));
-app.use(bodyParser.json());
-app.use(cors());
 
+const PORT = process.env.PORT || 3000;
+
+app.use(morgan('dev'));
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static('public/dist'));
+app.get('/', (req, res) => {
+  res.send(renderReact(req));
+});
+app.use('/', router);
+
+app.listen(PORT, () => {
+  console.log(`listening on port: ${PORT}`);
+});
+
+// production config:
+
+// app.use(compression());
+// app.get('/bundle.js', expressStaticGzip(__dirname + '../public/dist', {
+//   enableBrotli: true,
+//   orderPreference: ['br', 'gz'],
+//   setHeaders: function (res, path) {
+//      res.setHeader("Cache-Control", "public/dist, max-age=31536000");
+//   },
+// }));
 // app.get('*.js', (req, res, next) => {
 //   req.url = `${req.url}.gz`;
 //   res.set('Content-Encoding', 'gzip');
 //   next();
 // });
-
-app.get('/room', (req, res) => {
-  db.Room.findAll({
-    where: {
-      id: req.query.id,
-    },
-  })
-    .then((result) => {
-      res.send(result[0].dataValues);
-    })
-    .catch(() => {
-      res.sendStatus(500);
-    });
-});
-
-app.get('/booking', (req, res) => {
-  db.Booking.findAll({
-    where: {
-      roomId: req.query.id,
-    },
-  })
-    .then((result) => {
-      res.send(result);
-    })
-    .catch(() => {
-      res.sendStatus(500);
-    });
-});
-
-
-// making booking
-
-app.post('/booking', (req, res) => {
-  const data = {
-    roomId: req.body.roomId,
-    email: req.body.email,
-    guests: req.body.guests,
-    check_in: new Date(req.body.check_in),
-    check_out: new Date(req.body.check_out),
-    createdAt: new Date(req.body.createdAt),
-  };
-
-
-  db.Booking.create(data)
-    .catch((err) => {
-      console.log(`err: ${err}`);
-      res.sendStatus(500);
-    })
-    .then(() => {
-      console.log('Booking data is saved');
-      res.sendStatus(200);
-    });
-});
-
-app.listen(port, () => {
-  console.log(`Listening port: ${port}`);
-});
